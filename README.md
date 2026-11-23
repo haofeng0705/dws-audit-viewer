@@ -41,6 +41,8 @@ python3 server.py --sources sources.json --port 18766
 
 命令事件由支持该格式的 DWS 构建产生。裁剪判定和退出码分别展示，例如帮助查询以 `0` 退出，同时策略隐藏了该分组的所有子命令。开启审计、决定策略和生成日志由 DWS 负责。[DWS 命令审计实现（fork PR #6）](https://github.com/haofeng0705/dingtalk-workspace-cli/pull/6)
 
+勾选列表上方的「合并同名调用」后，相同命令路径会显示为一行，例如 `calendar/event/list × 3`。工具按产品和工具名称合并。次数随日志源、搜索和筛选条件一起变化。点击合并行，可以逐次查看时间、执行结果、策略判定和关联记录。缺少名称的调用保留独立行。
+
 ## 数据读取范围
 
 服务只监听 `127.0.0.1`。前台页面每 5 秒读取一次，可暂停自动刷新或手动刷新。每个来源的命令流和工具流分别最多读取最近 14 个日文件、4 MiB 和 1,000 条事件；达到上限时页面会提示，统计数字对应当前读取窗口。
@@ -52,6 +54,7 @@ python3 server.py --sources sources.json --port 18766
 ```bash
 python3 -B -m unittest discover -s tests -v
 node --check app.js
+node --test tests/grouping.test.js
 ```
 
 测试在临时目录创建虚构日志，并通过随机本机端口验证实际 HTTP 服务。

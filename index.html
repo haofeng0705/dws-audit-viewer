@@ -226,6 +226,17 @@
                   <option value="missing">无策略记录</option></select
                 ><svg class="icon drop"><use href="#i-down"></use></svg
               ></label>
+              <label class="group-option">
+                <input id="group-calls" type="checkbox" />
+                合并同名调用
+              </label>
+            </div>
+            <div id="group-trail" class="group-trail" hidden>
+              <button id="back-to-groups" type="button" class="plain-btn">
+                <svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>
+                返回合并列表
+              </button>
+              <span id="group-caption"></span>
             </div>
             <div class="scroller">
               <table>

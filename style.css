@@ -517,6 +517,40 @@ h2 {
   flex-wrap: wrap;
   padding: 16px 20px;
 }
+.group-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 35px;
+  padding-inline: 4px;
+  color: #34554b;
+  font-size: 12px;
+  cursor: pointer;
+}
+.group-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.group-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 0 20px 12px;
+  color: var(--muted);
+  font: 12px/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+.group-trail .plain-btn {
+  font-family: inherit;
+  color: #196b58;
+}
+.group-trail .icon {
+  transform: rotate(180deg);
+}
 .search-wrap {
   width: clamp(200px, 29vw, 355px);
   background: #f7f9f7;
@@ -617,6 +651,21 @@ td .arrow {
 }
 .row-btn:focus-visible {
   outline-offset: 3px;
+}
+.group-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.repeat-count {
+  display: inline-block;
+  margin-inline-start: 5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: #e4f1e9;
+  color: #216447;
+  font: 600 11px/1.55 var(--mono);
+  white-space: nowrap;
 }
 .badge {
   display: inline-flex;
@@ -1034,6 +1083,9 @@ dialog::backdrop {
   .filters {
     padding: 12px;
     gap: 6px;
+  }
+  .group-trail {
+    padding-inline: 12px;
   }
   .search-wrap {
     width: 100%;

@@ -10,6 +10,8 @@ const state = {
   result: "",
   decision: "",
   page: 1,
+  grouped: false,
+  groupDetail: null,
   selection: null,
   loading: false,
   loaded: false,
@@ -74,6 +76,27 @@ function toolTitle(e) {
 }
 function eventTitle(kind, e) {
   return kind === "tools" ? toolTitle(e) : commandTitle(e);
+}
+function callGroupKey(kind, row) {
+  const e = row.event;
+  if (kind === "tools")
+    return e.command ? JSON.stringify([e.product || "", e.command]) : null;
+  return e.command_path || null;
+}
+function groupCalls(rows, kind) {
+  const groups = [];
+  const named = new Map();
+  for (const row of rows) {
+    const key = callGroupKey(kind, row);
+    let group = named.get(key);
+    if (!group) {
+      group = { key, rows: [] };
+      groups.push(group);
+      if (key !== null) named.set(key, group);
+    }
+    group.rows.push(row);
+  }
+  return groups;
 }
 function isInScope(row) {
   return !state.source || row.source === state.source;
@@ -276,15 +299,104 @@ function rowNode(row, kind) {
   tr.addEventListener("click", () => openDetails(kind, row));
   return tr;
 }
+function countsCell(rows, infoFor, className = "") {
+  const counts = new Map();
+  for (const { event } of rows) {
+    const info = infoFor(event);
+    const entry = counts.get(info.label);
+    if (entry) entry.count++;
+    else counts.set(info.label, { info, count: 1 });
+  }
+  const cell = element("td", className);
+  const badges = element("div", "group-counts");
+  for (const { info, count } of counts.values()) {
+    const label = info.label + " × " + plural.format(count);
+    badges.append(badge({ ...info, label }));
+  }
+  cell.append(badges);
+  return cell;
+}
+function groupedRow(group, kind) {
+  const { rows } = group;
+  if (rows.length === 1) return rowNode(rows[0], kind);
+
+  const tr = element("tr");
+  tr.dataset.row = "true";
+  const title = eventTitle(kind, rows[0].event);
+  const action = element("button", "row-btn", title);
+  action.dataset.groupKey = group.key;
+  const count = plural.format(rows.length);
+  action.append(element("span", "repeat-count", "× " + count));
+  action.setAttribute("aria-label", "查看 " + title + " 的 " + count + " 次调用");
+  const name = element("td");
+  name.append(action);
+  const time = formatTime(rows[0].event.ts);
+  tr.append(
+    dualCell(time.time, time.date, "time"),
+    name,
+    countsCell(rows, (e) => statusInfo(e.result)),
+  );
+  if (kind === "commands")
+    tr.append(countsCell(rows, (e) => policyInfo(e.policy), "desktop-compact"));
+
+  let min = Infinity;
+  let max = -Infinity;
+  const sources = new Set();
+  for (const row of rows) {
+    const ms = row.event.duration_ms;
+    if (Number.isFinite(ms)) {
+      min = Math.min(min, ms);
+      max = Math.max(max, ms);
+    }
+    sources.add(row.source);
+  }
+  let elapsed = "—";
+  if (min !== Infinity) {
+    elapsed = min === max ? duration(min) : duration(min) + "–" + duration(max);
+  }
+  const source = sources.size === 1
+    ? labelSource(rows[0].source)
+    : sources.size + " 个来源";
+  tr.append(
+    dualCell(elapsed, null, "duration"),
+    dualCell(source, null, "source-name"),
+  );
+  const arrow = element("td");
+  arrow.append(icon("chevron", "arrow"));
+  tr.append(arrow);
+  tr.addEventListener("click", () => {
+    state.groupDetail = { key: group.key, returnPage: state.page };
+    state.page = 1;
+    render();
+    $("back-to-groups").focus();
+  });
+  return tr;
+}
 function renderTable(commands, tools) {
   const inTools = state.view === "tools",
     kind = inTools ? "tools" : "commands";
-  const list = filterRows(inTools ? tools : commands, kind);
+  const filtered = filterRows(inTools ? tools : commands, kind);
+  const groups = state.grouped ? groupCalls(filtered, kind) : null;
+  const detail = state.groupDetail &&
+    groups?.find((group) => group.key === state.groupDetail.key);
+  if (state.groupDetail && !detail) {
+    state.page = state.groupDetail.returnPage;
+    state.groupDetail = null;
+  }
+  const summary = state.grouped && !detail;
+  const list = detail?.rows ?? groups ?? filtered;
+  $("group-trail").hidden = !detail;
+  if (detail) {
+    const title = eventTitle(kind, detail.rows[0].event);
+    $("group-caption").textContent = title + " × " + plural.format(detail.rows.length);
+  }
   const pages = Math.max(1, Math.ceil(list.length / pageSize));
   state.page = Math.min(state.page, pages);
   const offset = (state.page - 1) * pageSize;
   $("view-title").textContent = views[state.view];
-  $("result-count").textContent = plural.format(list.length);
+  $("result-count").textContent = summary
+    ? plural.format(list.length) + " 组 · " + plural.format(filtered.length) + " 次调用"
+    : plural.format(list.length);
   $("policy-wrap").hidden = state.view !== "commands";
   $("search").placeholder = inTools
     ? "搜索工具、产品或执行 ID"
@@ -298,9 +410,11 @@ function renderTable(commands, tools) {
   const cols = inTools
     ? ["发生时间", "工具名称", "执行结果", "耗时", "日志源", ""]
     : ["发生时间", "命令路径", "执行结果", "策略判定", "耗时", "日志源", ""];
+  if (summary) cols[0] = "最近时间";
   $("table-head").replaceChildren(...cols.map((c) => element("th", "", c)));
+  const renderRow = summary ? groupedRow : rowNode;
   $("rows").replaceChildren(
-    ...list.slice(offset, offset + pageSize).map((r) => rowNode(r, kind)),
+    ...list.slice(offset, offset + pageSize).map((row) => renderRow(row, kind)),
   );
   $("empty").hidden = list.length > 0;
   const hasFilters = Boolean(
@@ -334,8 +448,8 @@ function renderTable(commands, tools) {
       Math.min(offset + pageSize, list.length) +
       "，共 " +
       plural.format(list.length) +
-      " 条"
-    : "共 0 条";
+      (summary ? " 组" : " 条")
+    : (summary ? "共 0 组" : "共 0 条");
   $("page").textContent = state.page + " / " + pages;
   $("prev").disabled = state.page <= 1;
   $("next").disabled = state.page >= pages;
@@ -540,6 +654,7 @@ async function refresh() {
   }
 }
 function resetFilters() {
+  state.groupDetail = null;
   state.page = 1;
   state.search = "";
   state.result = "";
@@ -548,67 +663,89 @@ function resetFilters() {
   $("result-filter").value = "";
   $("policy-filter").value = "";
 }
-document.querySelectorAll("[data-view]").forEach((button) =>
-  button.addEventListener("click", () => {
-    if (state.view === button.dataset.view) return;
-    state.view = button.dataset.view;
-    resetFilters();
-    render();
-  }),
-);
-$("clear").addEventListener("click", () => {
-  resetFilters();
-  render();
-});
-for (const [id, prop, event] of [
-  ["search", "search", "input"],
-  ["result-filter", "result", "change"],
-  ["policy-filter", "decision", "change"],
-  ["sources", "source", "change"],
-]) {
-  $(id).addEventListener(event, () => {
-    state[prop] = $(id).value;
+function startViewer() {
+  $("group-calls").checked = state.grouped;
+  $("group-calls").addEventListener("change", () => {
+    state.grouped = $("group-calls").checked;
+    state.groupDetail = null;
     state.page = 1;
     render();
   });
-}
-$("prev").addEventListener("click", () => {
-  state.page--;
-  render();
-});
-$("next").addEventListener("click", () => {
-  state.page++;
-  render();
-});
-$("close").addEventListener("click", () => $("drawer").close());
-$("drawer").addEventListener("close", () => {
-  state.selection = null;
-  lastDrawerKey = "";
-});
-$("drawer").addEventListener("click", (event) => {
-  if (event.target === $("drawer")) $("drawer").close();
-});
-document.addEventListener("keydown", (event) => {
-  if (
-    event.key === "/" &&
-    !event.ctrlKey &&
-    !event.metaKey &&
-    !event.altKey &&
-    !$("drawer").open &&
-    !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)
-  ) {
-    event.preventDefault();
-    $("search").focus();
+  $("back-to-groups").addEventListener("click", () => {
+    const { key, returnPage } = state.groupDetail;
+    state.groupDetail = null;
+    state.page = returnPage;
+    render();
+    Array.from($("rows").querySelectorAll("[data-group-key]"))
+      .find((button) => button.dataset.groupKey === key)?.focus();
+  });
+  document.querySelectorAll("[data-view]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (state.view === button.dataset.view) return;
+      state.view = button.dataset.view;
+      resetFilters();
+      render();
+    }),
+  );
+  $("clear").addEventListener("click", () => {
+    resetFilters();
+    render();
+  });
+  for (const [id, prop, event] of [
+    ["search", "search", "input"],
+    ["result-filter", "result", "change"],
+    ["policy-filter", "decision", "change"],
+    ["sources", "source", "change"],
+  ]) {
+    $(id).addEventListener(event, () => {
+      state.groupDetail = null;
+      state[prop] = $(id).value;
+      state.page = 1;
+      render();
+    });
   }
-});
-$("refresh").addEventListener("click", refresh);
-$("auto").addEventListener("change", () => {
-  if ($("auto").checked) refresh();
-});
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && $("auto").checked) refresh();
-});
-setInterval(() => {
-  if (!document.hidden && $("auto").checked) refresh();
-}, 5000);
-refresh();
+  $("prev").addEventListener("click", () => {
+    state.page--;
+    render();
+  });
+  $("next").addEventListener("click", () => {
+    state.page++;
+    render();
+  });
+  $("close").addEventListener("click", () => $("drawer").close());
+  $("drawer").addEventListener("close", () => {
+    state.selection = null;
+    lastDrawerKey = "";
+  });
+  $("drawer").addEventListener("click", (event) => {
+    if (event.target === $("drawer")) $("drawer").close();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "/" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !$("drawer").open &&
+      !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)
+    ) {
+      event.preventDefault();
+      $("search").focus();
+    }
+  });
+  $("refresh").addEventListener("click", refresh);
+  $("auto").addEventListener("change", () => {
+    if ($("auto").checked) refresh();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && $("auto").checked) refresh();
+  });
+  setInterval(() => {
+    if (!document.hidden && $("auto").checked) refresh();
+  }, 5000);
+  refresh();
+}
+
+if (typeof document !== "undefined") startViewer();
+if (typeof module !== "undefined" && module.exports)
+  module.exports = { callGroupKey, groupCalls };
