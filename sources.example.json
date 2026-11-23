@@ -1,0 +1,12 @@
+[
+  {
+    "id": "daily",
+    "label": "本机审计日志",
+    "path": "~/.dws/audit"
+  },
+  {
+    "id": "testing",
+    "label": "测试环境",
+    "path": "~/.dws-test/audit"
+  }
+]

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#103c39" />
+    <title>DWS · 本地审计工作台</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <symbol id="i-terminal" viewBox="0 0 24 24">
+          <path d="m5 7 5 5-5 5m8 0h6" />
+        </symbol>
+        <symbol id="i-record" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <path d="m7 9 3 3-3 3m6-1h4" />
+        </symbol>
+        <symbol id="i-tool" viewBox="0 0 24 24">
+          <path
+            d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 9v9m-8-13.5 8 4.5 8-4.5m-12-2.3 8 4.5"
+          />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="m12 3 8 3v5c0 5-4 8-8 10-4-2-8-5-8-10V6l8-3Z" />
+          <path d="M9 12h6" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4 10-10" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24">
+          <path d="M20 7v5h-5M4 17v-5h5" />
+          <path
+            d="M5.4 8.4A7 7 0 0 1 17 6.7l3 4.3M4 13l3 4.3a7 7 0 0 0 11.6-1.7"
+          />
+        </symbol>
+        <symbol id="i-files" viewBox="0 0 24 24">
+          <path
+            d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"
+          />
+        </symbol>
+        <symbol id="i-source" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v7c0 4 16 4 16 0V5M4 12v6c0 4 16 4 16 0v-6" />
+        </symbol>
+        <symbol id="i-filter" viewBox="0 0 24 24">
+          <path d="M4 7h16M7 12h10m-7 5h4" />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="m9 6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-down" viewBox="0 0 24 24">
+          <path d="m7 10 5 5 5-5" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="i-list" viewBox="0 0 24 24">
+          <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brandmark"
+            ><svg class="icon"><use href="#i-terminal"></use></svg></span
+          ><span class="wordmark"
+            >DWS<span class="brand-sub">Workspace CLI</span></span
+          >
+        </div>
+        <div class="nav-group">
+          <span class="nav-label">审计视图</span>
+          <nav aria-label="审计视图">
+            <button
+              data-view="commands"
+              class="nav-button active"
+              aria-current="page"
+            >
+              <svg class="icon"><use href="#i-record"></use></svg
+              ><span>命令事件</span>
+            </button>
+            <button data-view="tools" class="nav-button">
+              <svg class="icon"><use href="#i-tool"></use></svg
+              ><span>工具调用</span>
+            </button>
+            <button data-view="denied" class="nav-button">
+              <svg class="icon"><use href="#i-shield"></use></svg
+              ><span>策略拒绝</span
+              ><span id="nav-denied" class="nav-count" hidden></span>
+            </button>
+          </nav>
+        </div>
+        <div class="sidebar-foot">
+          <span class="connection-icon"
+            ><svg class="icon"><use href="#i-source"></use></svg
+          ></span>
+          <div>
+            <strong>本地日志源</strong
+            ><small id="sidebar-source-count">读取中…</small>
+          </div>
+        </div>
+      </aside>
+      <div class="workspace">
+        <header class="topbar">
+          <div class="crumb">
+            <span>DWS</span><svg class="icon"><use href="#i-chevron"></use></svg
+            ><strong>本地审计</strong>
+          </div>
+          <div class="live-tools">
+            <label class="toggle-wrap"
+              ><input id="auto" type="checkbox" checked /><span
+                class="toggle"
+                aria-hidden="true"
+              ></span
+              ><span>自动刷新</span></label
+            ><span class="separator"></span
+            ><button id="refresh" class="plain-btn">
+              <svg class="icon"><use href="#i-refresh"></use></svg>刷新
+            </button>
+          </div>
+        </header>
+        <main>
+          <div class="page-head">
+            <div>
+              <h1>审计工作台</h1>
+              <p id="last-updated">正在读取审计日志…</p>
+            </div>
+            <label class="select-wrap source-select"
+              ><svg class="icon"><use href="#i-source"></use></svg
+              ><select id="sources" aria-label="日志来源">
+                <option value="">全部日志源</option></select
+              ><svg class="icon drop"><use href="#i-down"></use></svg
+            ></label>
+          </div>
+          <div id="error" class="notice" role="alert" hidden></div>
+          <details id="warnings" class="notice" hidden>
+            <summary id="warnings-title"></summary>
+            <ul id="warning-items"></ul>
+          </details>
+          <section class="metrics" aria-label="所选日志源统计">
+            <div class="metric emphasis">
+              <div class="metric-head">
+                <span>命令事件</span
+                ><svg class="icon"><use href="#i-record"></use></svg>
+              </div>
+              <strong id="m-commands">—</strong
+              ><span class="metric-foot" id="f-commands">全部命令记录</span>
+            </div>
+            <div class="metric">
+              <div class="metric-head">
+                <span>执行成功</span
+                ><span class="metric-icon mint"
+                  ><svg class="icon"><use href="#i-check"></use></svg
+                ></span>
+              </div>
+              <strong id="m-success">—</strong
+              ><span class="metric-foot" id="f-success">命令退出码为 0</span>
+            </div>
+            <div class="metric">
+              <div class="metric-head">
+                <span>策略拒绝</span
+                ><span class="metric-icon amber"
+                  ><svg class="icon"><use href="#i-shield"></use></svg
+                ></span>
+              </div>
+              <strong id="m-denied">—</strong
+              ><span class="metric-foot" id="f-denied">命中拒绝判定</span>
+            </div>
+            <div class="metric">
+              <div class="metric-head">
+                <span>工具调用</span
+                ><span class="metric-icon blue"
+                  ><svg class="icon"><use href="#i-tool"></use></svg
+                ></span>
+              </div>
+              <strong id="m-tools">—</strong
+              ><span class="metric-foot" id="f-tools">已记录的工具事件</span>
+            </div>
+          </section>
+          <section class="panel" aria-labelledby="view-title">
+            <div class="panel-head">
+              <div class="section-title">
+                <span class="section-accent"></span>
+                <h2 id="view-title">命令事件</h2>
+                <span class="count" id="result-count">0</span>
+              </div>
+              <span class="sort-label"
+                ><svg class="icon"><use href="#i-clock"></use></svg
+                >最新优先</span
+              >
+            </div>
+            <div class="filters">
+              <label class="search-wrap"
+                ><svg class="icon"><use href="#i-search"></use></svg
+                ><input
+                  id="search"
+                  type="search"
+                  aria-label="搜索事件"
+                  placeholder="搜索命令、规则或事件 ID"
+                /><kbd>/</kbd></label
+              ><label class="select-wrap"
+                ><svg class="icon"><use href="#i-filter"></use></svg
+                ><select id="result-filter" aria-label="执行结果">
+                  <option value="">全部结果</option>
+                  <option value="success">执行成功</option>
+                  <option value="failure">执行失败</option></select
+                ><svg class="icon drop"><use href="#i-down"></use></svg></label
+              ><label class="select-wrap" id="policy-wrap"
+                ><select id="policy-filter" aria-label="策略判定">
+                  <option value="">全部策略判定</option>
+                  <option value="deny">拒绝</option>
+                  <option value="allow">放行</option>
+                  <option value="not_evaluated">未判定</option>
+                  <option value="missing">无策略记录</option></select
+                ><svg class="icon drop"><use href="#i-down"></use></svg
+              ></label>
+            </div>
+            <div class="scroller">
+              <table>
+                <thead>
+                  <tr id="table-head"></tr>
+                </thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+            <div id="empty" class="empty" hidden>
+              <span class="empty-icon"
+                ><svg class="icon"><use href="#i-files"></use></svg></span
+              ><strong id="empty-title">暂无记录</strong
+              ><span id="empty-text"></span
+              ><button id="clear" class="plain-btn" hidden>清空筛选</button>
+            </div>
+            <div class="panel-foot">
+              <span id="showing">正在载入…</span>
+              <div class="pagination">
+                <button id="prev" aria-label="上一页">‹</button
+                ><span id="page">1 / 1</span
+                ><button id="next" aria-label="下一页">›</button>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <dialog id="drawer">
+      <article class="drawer">
+        <header class="drawer-head">
+          <div>
+            <span class="detail-kicker" id="detail-kind"></span>
+            <h2 id="detail-title" tabindex="-1"></h2>
+          </div>
+          <button id="close" class="icon-btn" aria-label="关闭详情">
+            <svg class="icon"><use href="#i-close"></use></svg>
+          </button>
+        </header>
+        <div id="detail-body"></div>
+      </article>
+    </dialog>
+  </body>
+</html>

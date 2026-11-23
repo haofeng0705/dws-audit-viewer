@@ -1,0 +1,13 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+/sources.json
+/audit/
+/acceptance/
+*.log
+*.jsonl
+!/examples/demo/audit-20260102.jsonl
+!/examples/demo/commands/audit-20260102.jsonl
