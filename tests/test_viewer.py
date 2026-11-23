@@ -8,7 +8,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.request import ProxyHandler, build_opener
+
+from server import LoopbackServer, Viewer
 
 
 SERVER = Path(__file__).resolve().parents[1] / "server.py"
@@ -51,6 +54,12 @@ class ViewerTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.audit_dir = Path(tmp.name) / "audit"
+
+    def test_local_listener_starts_without_reverse_dns(self):
+        with patch("socket.getfqdn", side_effect=AssertionError("回环监听不需要 DNS")):
+            with LoopbackServer(("127.0.0.1", 0), Viewer) as server:
+                self.assertEqual(server.server_name, "127.0.0.1")
+                self.assertEqual(server.server_port, server.socket.getsockname()[1])
 
     def test_bundled_demo_shows_only_demo_events(self):
         with running_viewer("--demo") as get:

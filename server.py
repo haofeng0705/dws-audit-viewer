@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+from socketserver import TCPServer
 import stat
 from urllib.parse import urlsplit
 
@@ -178,6 +179,13 @@ def get_snapshot(sources):
     return output
 
 
+class LoopbackServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # 只监听固定的本机 IP，启动时无需等待系统反向解析主机名。
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address
+
+
 class Viewer(BaseHTTPRequestHandler):
     def __init__(self, *args, sources, **kwargs):
         self.sources = sources
@@ -286,7 +294,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     try:
         config = read_sources(args.sources, args.audit_dir, demo=args.demo)
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), partial(Viewer, sources=config))
+        server = LoopbackServer(("127.0.0.1", args.port), partial(Viewer, sources=config))
     except (OSError, ValueError, OverflowError) as err:
         parser.exit(1, f"启动失败：{err}\n")
     print(f"http://127.0.0.1:{server.server_port}/", flush=True)
